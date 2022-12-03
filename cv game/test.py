@@ -4,8 +4,8 @@ from cvzone.ColorModule import ColorFinder
 import numpy as np
 import math
 
-
 cap = cv2.VideoCapture(0)
+
 # resize
 frameResizeFactor = 0.7
 
@@ -32,12 +32,11 @@ colorFinder = ColorFinder(False)
 hsvVals = {"hmin": 139, "smin": 48, "vmin": 134, "hmax": 167, "smax": 255, "vmax": 253}
 
 
-def getArea(event, x, y, flags, param):
+def getArea(x, y):
     global selectedPts, warpTrue, warpWidth, warpHeight, matrix
-
-    if event == cv2.EVENT_LBUTTONDOWN and selectedPts.shape[0] <= 4:
+    x, y = int(x), int(y)
+    if selectedPts.shape[0] <= 4:
         selectedPts = np.append(selectedPts, np.float32([[x, y]]), axis=0)
-
     if selectedPts.shape[0] >= 4:
         if matrix is None:
             getProportion()
@@ -48,7 +47,7 @@ def getArea(event, x, y, flags, param):
 
 
 def drawCircles(pts, frame):
-    for pt in pts:
+    for pt in pts[:4]:
         cv2.circle(frame, (int(pt[0]), int(pt[1])), 2, (0, 255, 0), -1)
 
 def getProportion():
@@ -64,41 +63,31 @@ def getProportion():
     warpWidth = int(warpHeight * proportion)
     warppedPts = np.float32([[0, 0], [warpWidth, 0], [warpWidth, warpHeight], [0, warpHeight]])
 
-    print(proportion)
 
 # main loop
-def loop():
+def getFrames():
     while True:
-        # Capture frame-by-frame
-        ret, frame = cap.read()
+        success, frame = cap.read()
+        warppedFrame = frame
 
-        # drawCircles where selected points are
-        drawCircles(selectedPts, frame)
-
-        if warpTrue:
-            frame = cv2.warpPerspective(frame, matrix, (warpWidth, warpHeight))
-            frame = cv2.resize(frame, (0, 0), None, frameResizeFactor, frameResizeFactor)
-
-            # color finder
-            imageColor, mask = colorFinder.update(frame, hsvVals)
-            frame, contours = cvzone.findContours(frame, mask, minArea=200)
-
-            if contours:
-                cx, cy = contours[0]["center"]
-                cv2.circle(frame, (cx, cy), 5, (0, 255, 0), -1)
-
-        # showing frames
-        cv2.imshow("Video", frame)
-
-        # mouse event
-        cv2.setMouseCallback("Video", getArea)
-
-        if cv2.waitKey(1) & 0xFF == ord("q"):
+        if not success:
             break
+        else:
+            drawCircles(selectedPts, frame)
 
-    # When everything is done, release the capture
-    cap.release()
-    cv2.destroyAllWindows()
+            if warpTrue:
+                warppedFrame = cv2.warpPerspective(frame, matrix, (warpWidth, warpHeight))
+                warppedFrame = cv2.resize(warppedFrame, (0, 0), None, frameResizeFactor, frameResizeFactor)
 
-if __name__ == "__main__":
-    loop()
+                # color finder
+                imageColor, mask = colorFinder.update(warppedFrame, hsvVals)
+                warppedFrame, contours = cvzone.findContours(warppedFrame, mask, minArea=200)
+
+                if contours:
+                    cx, cy = contours[0]["center"]
+                    cv2.circle(warppedFrame, (cx, cy), 5, (0, 255, 0), -1)
+
+        ret, frame = cv2.imencode(".jpg", warppedFrame)
+        frame = frame.tobytes()
+
+        yield (b"--frame\r\n" b"Content-Type: image/jpeg\r\n\r\n" + frame + b"\r\n")

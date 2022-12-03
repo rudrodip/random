@@ -1,0 +1,13 @@
+{% extends "base.html" %} {% block title %} Open World Game {% endblock %} {%
+block style %}
+<link
+  rel="stylesheet"
+  href="{{ url_for('static', filename='/css/home.css') }}"
+/>
+{% endblock %} {% block content %}
+<h1>Home</h1>
+<div class="video-feed">
+  <img src="{{ url_for('video') }}" width="50%" id="frame"/>
+</div>
+<script src="{{url_for('static', filename='js/script.js')}}"></script>
+{% endblock %}
